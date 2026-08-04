@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  CUSTOMER
+}
+
+enum ListingStatus {
+  DRAFT
+  ACTIVE
+  SOLD
+  HIDDEN
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  DELIVERED
+  COMPLETED
+  DISPUTED
+  REFUNDED
+  CANCELLED
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  passwordHash String
+  role         Role      @default(CUSTOMER)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  listings     Listing[] @relation("SellerListings")
+  orders       Order[]   @relation("BuyerOrders")
+}
+
+model Listing {
+  id          String        @id @default(cuid())
+  title       String
+  description String
+  game        String
+  price       Int
+  status      ListingStatus @default(DRAFT)
+  sellerId    String
+  seller      User          @relation("SellerListings", fields: [sellerId], references: [id])
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  orders      Order[]
+}
+
+model Order {
+  id               String      @id @default(cuid())
+  listingId        String
+  listing          Listing     @relation(fields: [listingId], references: [id])
+  buyerId          String
+  buyer            User        @relation("BuyerOrders", fields: [buyerId], references: [id])
+  amount           Int
+  status           OrderStatus @default(PENDING_PAYMENT)
+  midtransOrderId  String?
+  accountPayload   String?
+  paidAt           DateTime?
+  deliveredAt      DateTime?
+  completedAt      DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+}
