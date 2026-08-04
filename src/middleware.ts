@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
+const COOKIE_NAME = "gam_token";
 
-async function verifyEdgeToken(token: string) {
+async function getPayload(req: NextRequest) {
+  const token = req.cookies.get(COOKIE_NAME)?.value;
+  if (!token) return null;
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
-    return payload as { userId: string; email: string; role: string };
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET || "dev-secret");
+    const { payload } = await jwtVerify(token, secret);
+    return payload as { userId: string; role: string };
   } catch {
     return null;
   }
@@ -14,32 +17,31 @@ async function verifyEdgeToken(token: string) {
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+  const session = await getPayload(req);
 
-  if (pathname.startsWith("/admin") || pathname.startsWith("/api/admin")) {
-    const token = req.cookies.get("token")?.value;
-    if (!token) return redirectOrUnauthorized(req);
-    const payload = await verifyEdgeToken(token);
-    if (!payload || payload.role !== "ADMIN") return redirectOrUnauthorized(req);
+  // Admin area
+  if (pathname.startsWith("/admin")) {
+    if (!session || session.role !== "ADMIN") {
+      const url = req.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("next", pathname);
+      return NextResponse.redirect(url);
+    }
   }
 
-  if (pathname.startsWith("/dashboard") || pathname.startsWith("/checkout")) {
-    const token = req.cookies.get("token")?.value;
-    if (!token) return redirectOrUnauthorized(req);
-    const payload = await verifyEdgeToken(token);
-    if (!payload) return redirectOrUnauthorized(req);
+  // Seller dashboard (customer login)
+  if (pathname.startsWith("/dashboard")) {
+    if (!session) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("next", pathname);
+      return NextResponse.redirect(url);
+    }
   }
 
   return NextResponse.next();
 }
 
-function redirectOrUnauthorized(req: NextRequest) {
-  if (req.nextUrl.pathname.startsWith("/api")) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const loginUrl = new URL("/login", req.url);
-  return NextResponse.redirect(loginUrl);
-}
-
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*", "/dashboard/:path*", "/checkout/:path*"],
+  matcher: ["/admin/:path*", "/dashboard/:path*"],
 };

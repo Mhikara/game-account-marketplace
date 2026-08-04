@@ -1,63 +1,59 @@
 "use client";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [form, setForm] = useState({ email: "", password: "" });
+  const search = useSearchParams();
+  const next = search.get("next") || "/";
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
-
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
-    });
-
-    const data = await res.json();
-    setLoading(false);
-
-    if (!res.ok) {
-      setError(data.error);
-      return;
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal login");
+      router.push(data.user?.role === "ADMIN" ? "/admin" : next);
+      router.refresh();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-
-    router.push("/dashboard");
-  }
+  };
 
   return (
-    <div className="max-w-md mx-auto mt-16 p-6 bg-white rounded-lg shadow">
-      <h1 className="text-2xl font-bold mb-4">Masuk</h1>
-      {error && <p className="text-red-500 mb-3 text-sm">{error}</p>}
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex items-center justify-center p-4">
+      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4 bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
+        <h1 className="text-xl font-bold">Login</h1>
+        {error && <p className="text-sm text-red-400">{error}</p>}
         <input
-          type="email"
-          placeholder="Email"
-          className="w-full border rounded px-3 py-2"
-          value={form.email}
-          onChange={(e) => setForm({ ...form, email: e.target.value })}
-          required
+          className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2"
+          type="email" placeholder="Email" value={email}
+          onChange={(e) => setEmail(e.target.value)} required
         />
         <input
-          type="password"
-          placeholder="Password"
-          className="w-full border rounded px-3 py-2"
-          value={form.password}
-          onChange={(e) => setForm({ ...form, password: e.target.value })}
-          required
+          className="w-full rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-2"
+          type="password" placeholder="Password" value={password}
+          onChange={(e) => setPassword(e.target.value)} required
         />
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
-        >
-          {loading ? "Memproses..." : "Masuk"}
+        <button disabled={loading} className="w-full rounded-lg bg-violet-600 hover:bg-violet-500 py-2 font-semibold">
+          {loading ? "Masuk..." : "Masuk"}
         </button>
+        <p className="text-sm text-zinc-400">
+          Belum punya akun? <Link href="/register" className="text-violet-400">Daftar</Link>
+        </p>
       </form>
     </div>
   );
