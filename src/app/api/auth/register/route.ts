@@ -9,21 +9,21 @@ const schema = z.object({
   password: z.string().min(6).max(100),
 });
 
-function friendlyDbError(err: any) {
-  const msg = String(err?.message || err || "");
+function friendlyDbError(err: unknown) {
+  const msg = String((err as any)?.message || err || "");
   if (msg.includes("Can't reach database") || msg.includes("P1001")) {
-    return "Database tidak bisa dihubungi. Cek Neon (nyalakan compute) dan DATABASE_URL di Vercel.";
+    return "Database tidak bisa dihubungi. Nyalakan Neon (SQL: SELECT 1) lalu coba lagi.";
   }
   if (msg.includes("does not exist") || msg.includes("P2021")) {
-    return "Tabel belum dibuat. Jalankan SQL CREATE TABLE di Neon.";
+    return "Tabel belum ada. Buat tabel di Neon SQL Editor.";
   }
   if (msg.includes("DATABASE_URL") || msg.includes("Environment variable")) {
-    return "DATABASE_URL belum di-set di Vercel.";
+    return "DATABASE_URL / DIRECT_URL belum di-set di Vercel.";
   }
   if (msg.includes("Unique constraint") || msg.includes("P2002")) {
     return "Email sudah terdaftar";
   }
-  return msg.slice(0, 200) || "Gagal register";
+  return msg.slice(0, 180) || "Gagal register";
 }
 
 export async function POST(req: NextRequest) {
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       user: { id: user.id, name: user.name, email: user.email, role: user.role },
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("[register]", err);
     return NextResponse.json({ error: friendlyDbError(err) }, { status: 500 });
   }
